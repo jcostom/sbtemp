@@ -1,0 +1,40 @@
+---
+version: '3'
+
+services:
+  sbtemp:
+    image: jcostom/sbtemp:latest
+    container_name: sbtemp
+    restart: unless-stopped
+    environment:
+      plugIP: FIXME-IP-ADDR
+      dayLow: 65
+      dayHigh: 69
+      nightLow: 62
+      nightHigh: 66
+      nightBegin: '22:00'
+      nightEnd: '06:00'
+      sleepTime: 300
+      APIKEY: FIXME-APIKEY
+      DEVID: FIXME-DEVID
+      TZ: America/New_York
+      influxBucket: FIXME
+      influxOrg: FIXME
+      influxToken: 'FIXME'
+      influxURL: 'http://FIXME:8086/'
+      influxMeasurement: FIXME
+    networks:
+      - containers
+
+networks:
+  containers:
+    external: true
+
+# or, if you don't already have that network defined, you could do it in this compose file.
+# networks:
+#   containers:
+#     name: containers
+#     driver: bridge
+#     attachable: true
+#     driver_opts:
+#       com.docker.network.bridge.name: br-containers
