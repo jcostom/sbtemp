@@ -3,6 +3,7 @@ FROM python:slim
 ENV TZ=America/New_York
 
 RUN \
+    apt update && apt -yq upgrade && apt autoclean \
     pip3 install requests \
     && pip3 install python-kasa \
     && pip3 install influxdb-client
