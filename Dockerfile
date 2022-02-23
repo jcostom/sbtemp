@@ -3,9 +3,10 @@ FROM python:slim
 ENV TZ=America/New_York
 
 RUN \
-    pip3 install requests \
-    && pip3 install python-kasa \
-    && pip3 install influxdb-client
+    pip install requests \
+    && pip install python-kasa \
+    && pip install influxdb-client \
+    && pip cache purge
 
 RUN mkdir /app
 COPY ./sbtemp.py /app
