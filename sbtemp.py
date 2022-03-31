@@ -24,6 +24,11 @@ influxToken = os.getenv('influxToken')
 influxURL = os.getenv('influxURL')
 influxMeasurement = os.getenv('influxMeasurement')
 
+version = '2.0.2'
+UA_STRING = "/".join(
+    ("sbtemp.py", version)
+)
+
 
 def c2f(celsius):
     return (celsius * 9/5) + 32
@@ -77,7 +82,7 @@ def main():
                                   org=influxOrg)
     write_api = influxClient.write_api(write_options=SYNCHRONOUS)
     timeRange = (nightBegin, nightEnd)
-    writeLogEntry('Startup', '')
+    writeLogEntry('Startup', UA_STRING)
     while True:
         (degF, rH) = readSensor(url, headers)
         watts = asyncio.run(readConsumption(plugIP))
