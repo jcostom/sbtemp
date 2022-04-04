@@ -24,7 +24,7 @@ influxToken = os.getenv('influxToken')
 influxURL = os.getenv('influxURL')
 influxMeasurement = os.getenv('influxMeasurement')
 
-version = '2.0.2'
+version = '2.1'
 UA_STRING = "/".join(
     ("sbtemp.py", version)
 )
