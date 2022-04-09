@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import os
-import time
 import asyncio
+import logging
 import requests
+from time import localtime, sleep, strftime
 from kasa import SmartPlug
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -23,11 +24,27 @@ influxOrg = os.getenv('influxOrg')
 influxToken = os.getenv('influxToken')
 influxURL = os.getenv('influxURL')
 influxMeasurement = os.getenv('influxMeasurement')
+DEBUG = int(os.getenv('DEBUG', 0))
 
-version = '2.1'
+version = '2.2'
 UA_STRING = "/".join(
-    ("sbtemp.py", version)
+    ["sbtemp.py", version]
 )
+
+# Setup logger
+logger = logging.getLogger()
+ch = logging.StreamHandler()
+if DEBUG:
+    logger.setLevel(logging.DEBUG)
+    ch.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+    ch.setLevel(logging.INFO)
+
+formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(message)s',
+                              datefmt='[%d %b %Y %H:%M:%S %Z]')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 
 def c2f(celsius):
@@ -39,11 +56,6 @@ def readSensor(sbURL, sbHeaders):
     # return array of (degF, rHum)
     return (round(c2f(r.json()['body']['temperature']), 1),
             r.json()['body']['humidity'])
-
-
-def writeLogEntry(message, status):
-    print(time.strftime("[%d %b %Y %H:%M:%S %Z]",
-          time.localtime()) + " {}: {}".format(message, status))
 
 
 def checkTimeRange(time, timeRange):
@@ -82,7 +94,7 @@ def main():
                                   org=influxOrg)
     write_api = influxClient.write_api(write_options=SYNCHRONOUS)
     timeRange = (nightBegin, nightEnd)
-    writeLogEntry('Startup', UA_STRING)
+    logger.info("Startup: {}".format(UA_STRING))
     while True:
         (degF, rH) = readSensor(url, headers)
         watts = asyncio.run(readConsumption(plugIP))
@@ -97,15 +109,15 @@ def main():
             }
         ]
         write_api.write(bucket=influxBucket, record=record)
-        now = time.strftime("%H:%M", time.localtime())
+        now = strftime("%H:%M", localtime())
         if checkTimeRange(now, timeRange):
             # We are in night schedule
             if degF < nightLow:
                 asyncio.run(plugOn(plugIP))
-                writeLogEntry('Night: Change state to ON, temp', degF)
+                logger.info("Night: Change state to ON, temp: {}".format(degF))
             elif degF > nightHigh:
                 asyncio.run(plugOff(plugIP))
-                writeLogEntry('Night: Change state to OFF, temp', degF)
+                logger.info("Night: Change state to OFF, temp: {}".format(degF)) # noqa E501
             else:
                 # no state change required
                 pass
@@ -113,14 +125,14 @@ def main():
             # we are in day schedule
             if degF < dayLow:
                 asyncio.run(plugOn(plugIP))
-                writeLogEntry('Day: Change state to ON, temp', degF)
+                logger.info("Day: Change state to ON, temp: {}".format(degF))
             elif degF > dayHigh:
                 asyncio.run(plugOff(plugIP))
-                writeLogEntry('Day: Change state to OFF, temp', degF)
+                logger.info("Day: Change state to OFF, temp: {}".format(degF))
             else:
                 # no state change required
                 pass
-        time.sleep(sleepTime)
+        sleep(sleepTime)
 
 
 if __name__ == "__main__":
