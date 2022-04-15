@@ -26,7 +26,7 @@ influxURL = os.getenv('influxURL')
 influxMeasurement = os.getenv('influxMeasurement')
 DEBUG = int(os.getenv('DEBUG', 0))
 
-version = '2.2'
+version = '2.3'
 UA_STRING = "/".join(
     ["sbtemp.py", version]
 )
@@ -94,7 +94,7 @@ def main():
                                   org=influxOrg)
     write_api = influxClient.write_api(write_options=SYNCHRONOUS)
     timeRange = (nightBegin, nightEnd)
-    logger.info("Startup: {}".format(UA_STRING))
+    logger.info(f"Startup: {UA_STRING}")
     while True:
         (degF, rH) = readSensor(url, headers)
         watts = asyncio.run(readConsumption(plugIP))
@@ -114,10 +114,10 @@ def main():
             # We are in night schedule
             if degF < nightLow:
                 asyncio.run(plugOn(plugIP))
-                logger.info("Night: Change state to ON, temp: {}".format(degF))
+                logger.info(f"Night: Change state to ON, temp: {degF}")
             elif degF > nightHigh:
                 asyncio.run(plugOff(plugIP))
-                logger.info("Night: Change state to OFF, temp: {}".format(degF)) # noqa E501
+                logger.info(f"Night: Change state to OFF, temp: {degF}")
             else:
                 # no state change required
                 pass
@@ -125,10 +125,10 @@ def main():
             # we are in day schedule
             if degF < dayLow:
                 asyncio.run(plugOn(plugIP))
-                logger.info("Day: Change state to ON, temp: {}".format(degF))
+                logger.info(f"Day: Change state to ON, temp: {degF}")
             elif degF > dayHigh:
                 asyncio.run(plugOff(plugIP))
-                logger.info("Day: Change state to OFF, temp: {}".format(degF))
+                logger.info(f"Day: Change state to OFF, temp: {degF}")
             else:
                 # no state change required
                 pass
