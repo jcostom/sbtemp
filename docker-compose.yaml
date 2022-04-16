@@ -7,22 +7,22 @@ services:
     container_name: sbtemp
     restart: unless-stopped
     environment:
-      plugIP: FIXME-IP-ADDR
-      dayLow: 65
-      dayHigh: 69
-      nightLow: 62
-      nightHigh: 66
-      nightBegin: '22:00'
-      nightEnd: '06:00'
-      sleepTime: 300
+      PLUG_IP: FIXME-IP-ADDR
+      DAY_LOW: 65
+      DAY_HIGH: 69
+      NIGHT_LOW: 62
+      NIGHT_HIGH: 66
+      NIGHT_BEGIN: '22:00'
+      NIGHT_END: '06:00'
+      SLEEP_TIME: 300
       APIKEY: FIXME-APIKEY
       DEVID: FIXME-DEVID
       TZ: America/New_York
-      influxBucket: FIXME
-      influxOrg: FIXME
-      influxToken: 'FIXME'
-      influxURL: 'http://FIXME:8086/'
-      influxMeasurement: FIXME
+      INFLUX_BUCKET: FIXME
+      INFLUX_ORG: FIXME
+      INFLUX_TOKEN: 'FIXME'
+      INFLUX_URL: 'http://FIXME:8086/'
+      INFLUX_MEASUREMENT: FIXME
     networks:
       - containers
 
