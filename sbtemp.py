@@ -9,6 +9,8 @@ from kasa import SmartPlug
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 
+# --- To be passed in to container ---
+# Required Vars
 PLUG_IP = os.getenv('PLUG_IP')
 DAY_LOW = int(os.getenv('DAY_LOW', 65))
 DAY_HIGH = int(os.getenv('DAY_HIGH', 69))
@@ -24,9 +26,12 @@ INFLUX_ORG = os.getenv('INFLUX_ORG')
 INFLUX_TOKEN = os.getenv('INFLUX_TOKEN')
 INFLUX_URL = os.getenv('INFLUX_URL')
 INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
+
+# Optional Vars
 DEBUG = int(os.getenv('DEBUG', 0))
 
-VER = '2.4.2'
+# --- Other Globals ---
+VER = '2.5'
 UA_STRING = f"sbtemp.py/{VER}"
 
 # Setup logger
@@ -81,7 +86,7 @@ async def read_consumption(ip: str) -> float:
     return(watts)
 
 
-def main():
+def main() -> None:
     url = f"https://api.switch-bot.com/v1.0/devices/{DEVID}/status"
     headers = {'Authorization': APIKEY}
     influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN,
