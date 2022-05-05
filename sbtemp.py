@@ -31,7 +31,7 @@ INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
 DEBUG = int(os.getenv('DEBUG', 0))
 
 # --- Other Globals ---
-VER = '2.5'
+VER = '2.5.1'
 UA_STRING = f"sbtemp.py/{VER}"
 
 # Setup logger
