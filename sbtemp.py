@@ -4,7 +4,10 @@ import os
 import asyncio
 import logging
 import requests
-from time import localtime, sleep, strftime
+from hashlib import sha256
+import hmac
+from base64 import b64encode
+from time import sleep, time, strftime, localtime
 from kasa import SmartPlug
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -19,7 +22,8 @@ NIGHT_HIGH = int(os.getenv('NIGHT_HIGH', 66))
 NIGHT_BEGIN = os.getenv('NIGHT_BEGIN')
 NIGHT_END = os.getenv('NIGHT_END')
 SLEEP_TIME = int(os.getenv('SLEEP_TIME', 300))
-APIKEY = os.getenv('APIKEY')
+TOKEN = os.getenv('TOKEN')
+SECRET = os.getenv('SECRET')
 DEVID = os.getenv('DEVID')
 INFLUX_BUCKET = os.getenv('INFLUX_BUCKET')
 INFLUX_ORG = os.getenv('INFLUX_ORG')
@@ -31,8 +35,9 @@ INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
 DEBUG = int(os.getenv('DEBUG', 0))
 
 # --- Other Globals ---
-VER = '2.5.1'
+VER = '2.6'
 UA_STRING = f"sbtemp.py/{VER}"
+URL = 'https://api.switch-bot.com/v1.1/devices/{}/status'
 
 # Setup logger
 logger = logging.getLogger()
@@ -54,9 +59,31 @@ def c2f(celsius: float) -> float:
     return (celsius * 9/5) + 32
 
 
-def read_sensor(sb_url: str, sb_headers: dict) -> list:
-    r = requests.get(sb_url, headers=sb_headers)
-    # return array of (degF, rHum)
+def build_headers(secret: str, token: str) -> dict:
+    nonce = ''
+    t = int(round(time() * 1000))
+    string_to_sign = f'{token}{t}{nonce}'
+    b_string_to_sign = bytes(string_to_sign, 'utf-8')
+    b_secret = bytes(secret, 'utf-8')
+    sign = b64encode(hmac.new(b_secret, msg=b_string_to_sign,
+                              digestmod=sha256).digest())
+    headers = {
+        'Authorization': token,
+        't': str(t),
+        'sign': sign,
+        'nonce': nonce
+    }
+    return headers
+
+
+def build_url(url_template: str, devid: str) -> str:
+    return url_template.format(devid)
+
+
+def read_sensor(devid: str, secret: str, token: str) -> list:
+    url = build_url(URL, devid)
+    headers = build_headers(secret, token)
+    r = requests.get(url, headers=headers)
     return [round(c2f(r.json()['body']['temperature']), 1),
             r.json()['body']['humidity']]
 
@@ -83,19 +110,17 @@ async def read_consumption(ip: str) -> float:
     p = SmartPlug(ip)
     await p.update()
     watts = await p.current_consumption()
-    return(watts)
+    return watts
 
 
 def main() -> None:
-    url = f"https://api.switch-bot.com/v1.0/devices/{DEVID}/status"
-    headers = {'Authorization': APIKEY}
     influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN,
                                    org=INFLUX_ORG)
     write_api = influx_client.write_api(write_options=SYNCHRONOUS)
     time_range = (NIGHT_BEGIN, NIGHT_END)
     logger.info(f"Startup: {UA_STRING}")
     while True:
-        (deg_f, rel_hum) = read_sensor(url, headers)
+        (deg_f, rel_hum) = read_sensor(DEVID, SECRET, TOKEN)
         watts = asyncio.run(read_consumption(PLUG_IP))
         record = [
             {

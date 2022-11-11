@@ -15,7 +15,8 @@ services:
       NIGHT_BEGIN: '22:00'
       NIGHT_END: '06:00'
       SLEEP_TIME: 300
-      APIKEY: FIXME-APIKEY
+      TOKEN: FIXME-TOKEN
+      SECRET: FIXME-SECRET
       DEVID: FIXME-DEVID
       TZ: America/New_York
       INFLUX_BUCKET: FIXME
