@@ -40,7 +40,7 @@ INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
 DEBUG = int(os.getenv('DEBUG', 0))
 
 # --- Other Globals ---
-VER = '3.0-TEST'
+VER = '3.0'
 UA_STRING = f"sbtemp.py/{VER}"
 URL = 'https://api.switch-bot.com/v1.1/devices/{}/status'
 
@@ -173,7 +173,7 @@ def main() -> None:
 
         # Check to see if we've hit the Presence Timeout value and act.
         t_now = int(time.mktime(time.localtime()))
-        if t_now - motion_last_seen > PRESENCE_TIMEOUT:
+        if t_now - motion_last_seen >= PRESENCE_TIMEOUT:
             # House is empty, so turn off
             logger.debug("House shows empty, turn off.")
             asyncio.run(plug_off(PLUG_IP))
