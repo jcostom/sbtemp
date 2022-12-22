@@ -161,8 +161,10 @@ def main() -> None:
             down_status = read_motion(MOTION_DOWN, SECRET, TOKEN)
             logger.debug(f"Motion Sensor {MOTION_DOWN} shows {down_status}.")
             if up_status or down_status:
-                logger.debug("Motion Detected! ")
+                logger.debug("Motion Detected! Updating last seen value.")
                 motion_last_seen = int(time.mktime(time.localtime()))
+            else:
+                logger.debug("No motion detected. No update to last seen value.")  # noqa E501
             time.sleep(PRESENCE_CHECK_INTERVAL)
 
         # Check to see if we've hit the Presence Timeout value and act.
