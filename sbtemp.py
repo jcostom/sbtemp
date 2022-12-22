@@ -153,12 +153,15 @@ def main() -> None:
             }
         ]
         write_api.write(bucket=INFLUX_BUCKET, record=record)
-        
+
         # Do presence check cycle
         for i in range(1, num_presence_checks):
             up_status = read_motion(MOTION_UP, SECRET, TOKEN)
+            logger.debug(f"Motion Sensor {MOTION_UP} shows {up_status}.")
             down_status = read_motion(MOTION_DOWN, SECRET, TOKEN)
+            logger.debug(f"Motion Sensor {MOTION_DOWN} shows {down_status}.")
             if up_status or down_status:
+                logger.debug("Motion Detected! ")
                 motion_last_seen = int(time.mktime(time.localtime()))
             time.sleep(PRESENCE_CHECK_INTERVAL)
 
@@ -166,9 +169,11 @@ def main() -> None:
         t_now = int(time.mktime(time.localtime()))
         if t_now - motion_last_seen > PRESENCE_TIMEOUT:
             # House is empty, so turn off
+            logger.debug("House shows empty, turn off.")
             asyncio.run(plug_off(PLUG_IP))
         else:
             # House is occupied, so check schedule, temp ranges, etc.
+            logger.debug("House shows occupied, so proceed.")
             now = time.strftime("%H:%M", time.localtime())
             if check_time_range(now, time_range):
                 # We are in night schedule
