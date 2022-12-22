@@ -138,7 +138,11 @@ def main() -> None:
     num_presence_checks = int(TEMP_READ_INTERVAL / PRESENCE_CHECK_INTERVAL)
     # If num_presence_checks has a remainder, add one to the checks total
     if TEMP_READ_INTERVAL % PRESENCE_CHECK_INTERVAL > 0:
+        logger.debug("Found remainder in calculating num_presence_checks, adding 1 to check count.")  # noqa E501
         num_presence_checks += 1
+    else:
+        logger.debug("No remainder found, leaving num_presence_checks count as-is.")  # noqa E501
+
     while True:
         (deg_f, rel_hum) = read_sensor(SENSOR, SECRET, TOKEN)
         watts = asyncio.run(read_consumption(PLUG_IP))
