@@ -4,10 +4,11 @@ import os
 import asyncio
 import logging
 import requests
+import secrets
 from hashlib import sha256
 import hmac
 from base64 import b64encode
-from time import sleep, time, strftime, localtime
+import time
 from kasa import SmartPlug
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -21,10 +22,14 @@ NIGHT_LOW = int(os.getenv('NIGHT_LOW', 62))
 NIGHT_HIGH = int(os.getenv('NIGHT_HIGH', 66))
 NIGHT_BEGIN = os.getenv('NIGHT_BEGIN')
 NIGHT_END = os.getenv('NIGHT_END')
-SLEEP_TIME = int(os.getenv('SLEEP_TIME', 300))
+PRESENCE_TIMEOUT = int(os.getenv('PRESENCE_TIMEOUT', 1800))
+PRESENCE_CHECK_INTERVAL = int(os.getenv('PRESENCE_CHECK_INTERVAL', 30))
+TEMP_READ_INTERVAL = int(os.getenv('TEMP_READ_INTERVAL', 300))
 TOKEN = os.getenv('TOKEN')
 SECRET = os.getenv('SECRET')
-DEVID = os.getenv('DEVID')
+SENSOR = os.getenv('SENSOR')
+MOTION_UP = os.getenv('MOTION_UP')
+MOTION_DOWN = os.getenv('MOTION_DOWN')
 INFLUX_BUCKET = os.getenv('INFLUX_BUCKET')
 INFLUX_ORG = os.getenv('INFLUX_ORG')
 INFLUX_TOKEN = os.getenv('INFLUX_TOKEN')
@@ -35,7 +40,7 @@ INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
 DEBUG = int(os.getenv('DEBUG', 0))
 
 # --- Other Globals ---
-VER = '2.6'
+VER = '3.0'
 UA_STRING = f"sbtemp.py/{VER}"
 URL = 'https://api.switch-bot.com/v1.1/devices/{}/status'
 
@@ -60,8 +65,8 @@ def c2f(celsius: float) -> float:
 
 
 def build_headers(secret: str, token: str) -> dict:
-    nonce = ''
-    t = int(round(time() * 1000))
+    nonce = secrets.token_urlsafe()
+    t = int(round(time.time() * 1000))
     string_to_sign = f'{token}{t}{nonce}'
     b_string_to_sign = bytes(string_to_sign, 'utf-8')
     b_secret = bytes(secret, 'utf-8')
@@ -86,6 +91,13 @@ def read_sensor(devid: str, secret: str, token: str) -> list:
     r = requests.get(url, headers=headers)
     return [round(c2f(r.json()['body']['temperature']), 1),
             r.json()['body']['humidity']]
+
+
+def read_motion(devid: str, secret: str, token: str) -> bool:
+    url = build_url(URL, devid)
+    headers = build_headers(secret, token)
+    r = requests.get(url, headers=headers)
+    return r.json()['body']['moveDetected']
 
 
 def check_time_range(time: str, time_range: list) -> bool:
@@ -114,13 +126,25 @@ async def read_consumption(ip: str) -> float:
 
 
 def main() -> None:
+    logger.info(f"Startup: {UA_STRING}")
     influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN,
                                    org=INFLUX_ORG)
     write_api = influx_client.write_api(write_options=SYNCHRONOUS)
     time_range = (NIGHT_BEGIN, NIGHT_END)
-    logger.info(f"Startup: {UA_STRING}")
+    # init motion last-seen as right now
+    # since Switchbot doesn't keep a history
+    motion_last_seen = int(time.mktime(time.localtime()))
+    # figure out how many times we need to check per cycle
+    num_presence_checks = int(TEMP_READ_INTERVAL / PRESENCE_CHECK_INTERVAL)
+    # If num_presence_checks has a remainder, add one to the checks total
+    if TEMP_READ_INTERVAL % PRESENCE_CHECK_INTERVAL > 0:
+        logger.debug("Found remainder in calculating num_presence_checks, adding 1 to check count.")  # noqa E501
+        num_presence_checks += 1
+    else:
+        logger.debug("No remainder found, leaving num_presence_checks count as-is.")  # noqa E501
+
     while True:
-        (deg_f, rel_hum) = read_sensor(DEVID, SECRET, TOKEN)
+        (deg_f, rel_hum) = read_sensor(SENSOR, SECRET, TOKEN)
         watts = asyncio.run(read_consumption(PLUG_IP))
         record = [
             {
@@ -133,30 +157,52 @@ def main() -> None:
             }
         ]
         write_api.write(bucket=INFLUX_BUCKET, record=record)
-        now = strftime("%H:%M", localtime())
-        if check_time_range(now, time_range):
-            # We are in night schedule
-            if deg_f < NIGHT_LOW:
-                asyncio.run(plug_on(PLUG_IP))
-                logger.info(f"Night: Change state to ON, temp: {deg_f}")
-            elif deg_f > NIGHT_HIGH:
-                asyncio.run(plug_off(PLUG_IP))
-                logger.info(f"Night: Change state to OFF, temp: {deg_f}")
+
+        # Do presence check cycle
+        for i in range(1, num_presence_checks):
+            up_status = read_motion(MOTION_UP, SECRET, TOKEN)
+            logger.debug(f"Motion Sensor {MOTION_UP} shows {up_status}.")
+            down_status = read_motion(MOTION_DOWN, SECRET, TOKEN)
+            logger.debug(f"Motion Sensor {MOTION_DOWN} shows {down_status}.")
+            if up_status or down_status:
+                logger.debug("Motion Detected! Updating last seen value.")
+                motion_last_seen = int(time.mktime(time.localtime()))
             else:
-                # no state change required
-                pass
+                logger.debug("No motion detected. No update to last seen value.")  # noqa E501
+            time.sleep(PRESENCE_CHECK_INTERVAL)
+
+        # Check to see if we've hit the Presence Timeout value and act.
+        t_now = int(time.mktime(time.localtime()))
+        if t_now - motion_last_seen >= PRESENCE_TIMEOUT:
+            # House is empty, so turn off
+            logger.debug("House shows empty, turn off.")
+            asyncio.run(plug_off(PLUG_IP))
         else:
-            # we are in day schedule
-            if deg_f < DAY_LOW:
-                asyncio.run(plug_on(PLUG_IP))
-                logger.info(f"Day: Change state to ON, temp: {deg_f}")
-            elif deg_f > DAY_HIGH:
-                asyncio.run(plug_off(PLUG_IP))
-                logger.info(f"Day: Change state to OFF, temp: {deg_f}")
+            # House is occupied, so check schedule, temp ranges, etc.
+            logger.debug("House shows occupied, so proceed.")
+            now = time.strftime("%H:%M", time.localtime())
+            if check_time_range(now, time_range):
+                # We are in night schedule
+                if deg_f < NIGHT_LOW:
+                    asyncio.run(plug_on(PLUG_IP))
+                    logger.info(f"Night: Change state to ON, temp: {deg_f}")  # noqa E501
+                elif deg_f > NIGHT_HIGH:
+                    asyncio.run(plug_off(PLUG_IP))
+                    logger.info(f"Night: Change state to OFF, temp: {deg_f}")  # noqa E501
+                else:
+                    # no state change required
+                    pass
             else:
-                # no state change required
-                pass
-        sleep(SLEEP_TIME)
+                # we are in day schedule
+                if deg_f < DAY_LOW:
+                    asyncio.run(plug_on(PLUG_IP))
+                    logger.info(f"Day: Change state to ON, temp: {deg_f}")
+                elif deg_f > DAY_HIGH:
+                    asyncio.run(plug_off(PLUG_IP))
+                    logger.info(f"Day: Change state to OFF, temp: {deg_f}")
+                else:
+                    # no state change required
+                    pass
 
 
 if __name__ == "__main__":
