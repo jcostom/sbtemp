@@ -136,6 +136,7 @@ def main() -> None:
     motion_last_seen = int(time.mktime(time.localtime()))
     # figure out how many times we need to check per cycle
     num_presence_checks = int(TEMP_READ_INTERVAL / PRESENCE_CHECK_INTERVAL)
+    # If num_presence_checks has a remainder, add one to the checks total
     if TEMP_READ_INTERVAL % PRESENCE_CHECK_INTERVAL > 0:
         num_presence_checks += 1
     while True:
@@ -152,41 +153,45 @@ def main() -> None:
             }
         ]
         write_api.write(bucket=INFLUX_BUCKET, record=record)
+        
         # Do presence check cycle
         for i in range(1, num_presence_checks):
             up_status = read_motion(MOTION_UP, SECRET, TOKEN)
             down_status = read_motion(MOTION_DOWN, SECRET, TOKEN)
             if up_status or down_status:
                 motion_last_seen = int(time.mktime(time.localtime()))
-            t_now = int(time.mktime(time.localtime()))
-            if t_now - motion_last_seen > PRESENCE_TIMEOUT:
-                # House is empty, so turn off
-                asyncio.run(plug_off(PLUG_IP))
-            else:
-                # House is occupied, so check schedule, temp ranges, etc.
-                now = time.strftime("%H:%M", time.localtime())
-                if check_time_range(now, time_range):
-                    # We are in night schedule
-                    if deg_f < NIGHT_LOW:
-                        asyncio.run(plug_on(PLUG_IP))
-                        logger.info(f"Night: Change state to ON, temp: {deg_f}")  # noqa E501
-                    elif deg_f > NIGHT_HIGH:
-                        asyncio.run(plug_off(PLUG_IP))
-                        logger.info(f"Night: Change state to OFF, temp: {deg_f}")  # noqa E501
-                    else:
-                        # no state change required
-                        pass
+            time.sleep(PRESENCE_CHECK_INTERVAL)
+
+        # Check to see if we've hit the Presence Timeout value and act.
+        t_now = int(time.mktime(time.localtime()))
+        if t_now - motion_last_seen > PRESENCE_TIMEOUT:
+            # House is empty, so turn off
+            asyncio.run(plug_off(PLUG_IP))
+        else:
+            # House is occupied, so check schedule, temp ranges, etc.
+            now = time.strftime("%H:%M", time.localtime())
+            if check_time_range(now, time_range):
+                # We are in night schedule
+                if deg_f < NIGHT_LOW:
+                    asyncio.run(plug_on(PLUG_IP))
+                    logger.info(f"Night: Change state to ON, temp: {deg_f}")  # noqa E501
+                elif deg_f > NIGHT_HIGH:
+                    asyncio.run(plug_off(PLUG_IP))
+                    logger.info(f"Night: Change state to OFF, temp: {deg_f}")  # noqa E501
                 else:
-                    # we are in day schedule
-                    if deg_f < DAY_LOW:
-                        asyncio.run(plug_on(PLUG_IP))
-                        logger.info(f"Day: Change state to ON, temp: {deg_f}")
-                    elif deg_f > DAY_HIGH:
-                        asyncio.run(plug_off(PLUG_IP))
-                        logger.info(f"Day: Change state to OFF, temp: {deg_f}")
-                    else:
-                        # no state change required
-                        pass
+                    # no state change required
+                    pass
+            else:
+                # we are in day schedule
+                if deg_f < DAY_LOW:
+                    asyncio.run(plug_on(PLUG_IP))
+                    logger.info(f"Day: Change state to ON, temp: {deg_f}")
+                elif deg_f > DAY_HIGH:
+                    asyncio.run(plug_off(PLUG_IP))
+                    logger.info(f"Day: Change state to OFF, temp: {deg_f}")
+                else:
+                    # no state change required
+                    pass
 
 
 if __name__ == "__main__":
