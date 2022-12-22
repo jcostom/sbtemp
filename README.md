@@ -8,7 +8,7 @@ I know, never connect those to smart plugs. This space heater is small and draws
 
 For an added bonus and general showing off, we're stuffing the data into InfluxDB and making pretty graphs of temperature, humidity, and power use. What can I say? I'm a data nerd.
 
-To bring this thing online, first setup an InfluxDB instance. I used InfluxDB 2.1, and the code is written for the Influx 2.0 API, so bear that in mind. In other words, don't stand up InfluxDB 1.something and wonder why it's not working.
+To bring this thing online, first setup an InfluxDB instance. I used InfluxDB 2.1, and the code is written for the Influx 2.0 API, so bear that in mind. In other words, don't stand up InfluxDB 1.something and wonder why it's not working. It still runs great, even on InfluxDB 2.6, as of Dec 2022.
 
 Next, fill in the various variables in the docker-compose file for sbtemp and launch the container. You can do it from the CLI, or the way I do, from inside Portainer. You do you.
 
