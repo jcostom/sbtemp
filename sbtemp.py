@@ -40,7 +40,7 @@ INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
 DEBUG = int(os.getenv('DEBUG', 0))
 
 # --- Other Globals ---
-VER = '3.0'
+VER = '3.0.1'
 UA_STRING = f"sbtemp.py/{VER}"
 URL = 'https://api.switch-bot.com/v1.1/devices/{}/status'
 
@@ -142,6 +142,9 @@ def main() -> None:
         num_presence_checks += 1
     else:
         logger.debug("No remainder found, leaving num_presence_checks count as-is.")  # noqa E501
+    
+    # Initialize HOME_STATUS as home
+    HOME_STATUS = 'home'
 
     while True:
         (deg_f, rel_hum) = read_sensor(SENSOR, SECRET, TOKEN)
@@ -175,11 +178,15 @@ def main() -> None:
         t_now = int(time.mktime(time.localtime()))
         if t_now - motion_last_seen >= PRESENCE_TIMEOUT:
             # House is empty, so turn off
-            logger.debug("House shows empty, turn off.")
-            asyncio.run(plug_off(PLUG_IP))
+            if HOME_STATUS == 'home':
+                HOME_STATUS = 'away'
+                logger.info(f"House shows empty, setting status to {HOME_STATUS}")  # noqa E501
+                asyncio.run(plug_off(PLUG_IP))
         else:
             # House is occupied, so check schedule, temp ranges, etc.
-            logger.debug("House shows occupied, so proceed.")
+            if HOME_STATUS == 'away':
+                HOME_STATUS = 'home'
+                logger.info(f"House shows occupied, setting status to {HOME_STATUS}")  # noqa E501
             now = time.strftime("%H:%M", time.localtime())
             if check_time_range(now, time_range):
                 # We are in night schedule
