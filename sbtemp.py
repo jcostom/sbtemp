@@ -142,7 +142,7 @@ def main() -> None:
         num_presence_checks += 1
     else:
         logger.debug("No remainder found, leaving num_presence_checks count as-is.")  # noqa E501
-    
+
     # Initialize HOME_STATUS as home
     HOME_STATUS = 'home'
 
