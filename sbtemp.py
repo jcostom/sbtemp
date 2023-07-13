@@ -40,24 +40,16 @@ INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
 DEBUG = int(os.getenv('DEBUG', 0))
 
 # --- Other Globals ---
-VER = '3.0.6'
+VER = '3.1'
 UA_STRING = f"sbtemp.py/{VER}"
 URL = 'https://api.switch-bot.com/v1.1/devices/{}/status'
 
 # Setup logger
+LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
+logging.basicConfig(level=LOG_LEVEL,
+                    format='[%(levelname)s] %(asctime)s %(message)s',
+                    datefmt='[%d %b %Y %H:%M:%S %Z]')
 logger = logging.getLogger()
-ch = logging.StreamHandler()
-if DEBUG:
-    logger.setLevel(logging.DEBUG)
-    ch.setLevel(logging.DEBUG)
-else:
-    logger.setLevel(logging.INFO)
-    ch.setLevel(logging.INFO)
-
-formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(message)s',
-                              datefmt='[%d %b %Y %H:%M:%S %Z]')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
 
 
 def c2f(celsius: float) -> float:
