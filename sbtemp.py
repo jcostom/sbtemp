@@ -40,7 +40,7 @@ INFLUX_MEASUREMENT = os.getenv('INFLUX_MEASUREMENT')
 DEBUG = int(os.getenv('DEBUG', 0))
 
 # --- Other Globals ---
-VER = '3.1.3'
+VER = '3.1.4'
 UA_STRING = f"sbtemp.py/{VER}"
 URL = 'https://api.switch-bot.com/v1.1/devices/{}/status'
 
